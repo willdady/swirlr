@@ -5,85 +5,51 @@ use rand::prelude::*;
 
 #[allow(unused_imports)]
 use image::*;
-#[allow(unused_imports)]
 use std::f64::consts::PI;
 
 #[derive(Debug)]
-struct Rect {
-    x: i64,
-    y: i64,
-    width: i64,
-    height: i64
+struct Point {
+    x: f64,
+    y: f64
 }
 
-// Get distance between two points
-fn dist(x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
-    ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt()
-}
-
-fn render_brush(size: u32) -> RgbImage {
-    let mut rng = rand::thread_rng();
-    let mut img = DynamicImage::new_rgb8(size, size).to_rgb();
-    let black = image::Rgb([0, 0, 0]);
-    let white = image::Rgb([255, 255, 255]);
-    // let red = image::Rgb([255, 0, 0]);
-    let radius = (size / 2) as f64 - 1.0;
-    let origin_x = radius + 1.0;
-    let origin_y = radius + 1.0;
-    const SAMPLES: f64 = 50.0;
-    const SAMPLES_USIZE: usize = SAMPLES as usize;
-    for y in 0..size {
-        for x in 0..size {
-            // Supersampling
-            let mut colours: [Rgb<u8>; SAMPLES_USIZE] = [black; SAMPLES_USIZE];
-            for j in 0..SAMPLES_USIZE {
-                let u = x as f64 + 0.5 + rng.gen_range(-0.5, 0.5);
-                let v = y as f64 + 0.5 + rng.gen_range(-0.5, 0.5);
-                let d = dist(u, v, origin_x, origin_y);
-                if d <= radius {
-                    colours[j] = white;
-                } else {
-                    colours[j] = black;
-                }
-            }
-            let mut r: f64 = 0.0;
-            let mut g: f64 = 0.0;
-            let mut b: f64 = 0.0;
-            for k in 0..SAMPLES_USIZE {
-                r += colours[k][0] as f64;
-                g += colours[k][1] as f64;
-                b += colours[k][2] as f64;
-            }
-            r = r / SAMPLES;
-            g = g / SAMPLES;
-            b = b / SAMPLES;
-            img.put_pixel(x, y, Rgb([r.round() as u8, g.round() as u8, b.round() as u8]));
-        }
+impl Point {
+    fn dist(&self, point: &Point) -> f64 {
+        ((point.x - self.x).powi(2) + (point.y - self.y).powi(2)).sqrt()
     }
-    return img;
+
+    fn angle(&self, point: &Point) -> f64 {
+        let delta_x = point.x - self.x;
+        let delta_y = point.y - self.y;
+        delta_y.atan2(delta_x)
+    }
 }
 
-fn render(source: &RgbImage) -> RgbImage {
+fn render(source: &mut RgbImage) -> RgbImage {
+    let red = Rgb([255, 0, 0]);
+    let blue = Rgb([0, 0, 255]);
+    let white = Rgb([255, 255, 255]);
+    let black = Rgb([0, 0, 0]);
+
+    let sample_length = 1.5;
+
     let size = source.width();
+
     let mut output = RgbImage::new(size, size);
+    fill_image(&mut output, white);
+
     let output_width = size as f64;
     let output_height = size as f64;
     let origin_x = (size / 2) as f64;
     let origin_y = (size / 2) as f64;
-    let iterations = 100000;
+    let iterations = 1000000;
     let mut x;
     let mut y;
     let mut r;
     let mut theta;
 
-    // Create brushes
-    let mut brushes = Vec::new();
-    for i in 0..=10 {
-        brushes.push(render_brush((i + 1) * 2))
-    }
-
     let a = 0.0;
-    let b = 5.0;
+    let b = 1.0;
     let loops = 100.0;
 
     let slice = 2.0 * PI / iterations as f64;
@@ -96,39 +62,58 @@ fn render(source: &RgbImage) -> RgbImage {
         if x < 0.0 || x > output_width || y < 0.0 || y > output_height {
             break;
         }
-        let rect = Rect{
-            x: x as i64 - 10,
-            y: y as i64 - 10,
-            width: 10,
-            height: 10
+        let p0 = Point{x, y};
+        let p1 = Point{
+            x: p0.x - sample_length * theta.cos(),
+            y: p0.y - sample_length * theta.sin()
         };
-        let average_rgb = get_average_rgb(&source, &rect);
-        let average_luma = average_rgb.to_luma();
-        // Get brush for luma
-        let l = 10 - ((average_luma.data[0] as f64 / 255.0) * 10.0).round() as usize;
-        let brush = &brushes[l];
-        let target_x = x as i64 - brush.width() as i64 / 2;
-        let target_y = y as i64 - brush.height() as i64 / 2;
-        apply_brush(&mut output, brush, target_x, target_y);
+        let p2 = Point{
+            x: p0.x + sample_length * theta.cos(),
+            y: p0.y + sample_length * theta.sin()
+        };
+
+        let dist = p1.dist(&p2) as u32;
+        let mut pixels = vec!();
+        for i in 0..dist {
+            let sx = (p1.x + i as f64 * theta.cos()).round() as u32;
+            let sy = (p1.y + i as f64 * theta.sin()).round() as u32;
+            if sx > size - 1 || sy > size - 1 {
+                continue;
+            }
+            // println!("Put {}, {}", sx, sy);
+            let pixel = source.get_pixel(sx, sy);
+            pixels.push(pixel);
+        };
+        let average_rgb = get_average_rgb(&pixels);
+        let luma = average_rgb.to_luma();
+
+        let mut dist2 = ((255.0 - luma.data[0] as f64) / 255.0) * (sample_length * 2.0);
+        if dist2 < 1.0 {
+            dist2 = 1.0;
+        }
+        let p1 = Point{
+            x: p0.x - dist2 * theta.cos(),
+            y: p0.y - dist2 * theta.sin()
+        };
+        let p2 = Point{
+            x: p0.x + dist2 * theta.cos(),
+            y: p0.y + dist2 * theta.sin()
+        };
+        draw_line(&mut output, &p1, &p2, black);
     }
     output
 }
 
-fn get_average_rgb(source: &RgbImage, rect: &Rect) -> Rgb<u8> {
-    // println!("get_average_rgb {:?}", rect);
+fn get_average_rgb(pixels: &Vec<&Rgb<u8>>) -> Rgb<u8> {
     let mut r: f64 = 0.0;
     let mut g: f64 = 0.0;
     let mut b: f64 = 0.0;
     let mut count = 0.0;
-    for y in rect.y..rect.y + rect.width {
-        for x in rect.x..rect.x + rect.height {
-            let p = source.get_pixel(x as u32, y as u32);
-            // println!("{:?}", p);
-            r += p.data[0] as f64;
-            g += p.data[1] as f64;
-            b += p.data[2] as f64;
-            count += 1.0;
-        }
+    for i in pixels {
+        r += i.data[0] as f64;
+        g += i.data[1] as f64;
+        b += i.data[2] as f64;
+        count += 1.0;
     }
     r = r / count;
     g = g / count;
@@ -136,27 +121,39 @@ fn get_average_rgb(source: &RgbImage, rect: &Rect) -> Rgb<u8> {
     return Rgb([r.round() as u8, g.round() as u8, b.round() as u8])
 }
 
-fn apply_brush(target: &mut RgbImage, brush: &RgbImage, x: i64, y: i64) {
-    let target_width = target.width() as i64;
-    let target_height = target.height() as i64;
-    let red = image::Rgb([255, 0, 0]);
-    for v in 0..brush.height() {
-        for u in 0..brush.width() {
-            let p = brush.get_pixel(u as u32, v as u32);
-            if p.data[0] != 0 {
-                let target_x = x + u as i64;
-                let target_y = y + v as i64;
-                if target_x < 0 || target_y < 0 || target_x > target_width - 1 || target_y > target_height - 1 {
-                    continue;
-                }
-                target.put_pixel(target_x as u32, target_y as u32, red);
-            }
+fn fill_image(image: &mut RgbImage, color: Rgb<u8>) {
+    let (width, height) = image.dimensions();
+    for y in 0..height {
+        for x in 0..width {
+            image.put_pixel(x, y, color);
         }
     }
 }
 
+fn draw_line(target: &mut RgbImage, from: &Point, to: &Point, color: Rgb<u8>) {
+    let dist = from.dist(&to) as u32;
+    let (width, height) = target.dimensions();
+    if dist == 0 {
+        return;
+    }
+    let angle = from.angle(to);
+    for i in 0..dist {
+        let x = (from.x + i as f64 * angle.cos()).round() as u32;
+        let y = (from.y + i as f64 * angle.sin()).round() as u32;
+        // println!("Put {}, {}", x, y);
+        if x > width - 1 || y > height - 1 {
+            continue;
+        }
+        target.put_pixel(x, y, color);
+    }
+}
+
 fn main() {
-    let norma = image::open("norma.jpg").unwrap().to_rgb();
-    let output = render(&norma);
+    let mut norma = image::open("norma.jpg").unwrap().to_rgb();
+    let output = render(&mut norma);
+    // // let output = render(&norma);
+    // let p1 = Point{x: 0.0, y: 0.0};
+    // let p2 = Point{x: 50.0, y: 50.0};
+    // draw_line(&mut norma, &p1, &p2);
     output.save("output.png").unwrap();
 }
