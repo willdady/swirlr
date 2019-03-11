@@ -1,9 +1,5 @@
 extern crate image;
-extern crate rand;
 
-use rand::prelude::*;
-
-#[allow(unused_imports)]
 use image::*;
 use std::f64::consts::PI;
 
@@ -26,78 +22,70 @@ impl Point {
 }
 
 fn render(source: &mut RgbImage) -> RgbImage {
-    let red = Rgb([255, 0, 0]);
-    let blue = Rgb([0, 0, 255]);
     let white = Rgb([255, 255, 255]);
     let black = Rgb([0, 0, 0]);
 
-    let sample_length = 1.5;
+    let size = source.width() as f64;
+    // Keep the spiral within a 5px gutter
+    let max_radius = (size * 0.5) - 5.0;
 
-    let size = source.width();
-
-    let mut output = RgbImage::new(size, size);
+    let mut output = RgbImage::new(size as u32, size as u32);
     fill_image(&mut output, white);
 
-    let output_width = size as f64;
-    let output_height = size as f64;
-    let origin_x = (size / 2) as f64;
-    let origin_y = (size / 2) as f64;
-    let iterations = 1000000;
-    let mut x;
-    let mut y;
+    let origin_x = size * 0.5;
+    let origin_y = size * 0.5;
     let mut r;
-    let mut theta;
+
+    // The number of turns of the spiral, set arbitrarily large
+    // so the spiral is larger than the source image. Note the
+    // loop below will break before this number of turns is reached
+    // hence why this is arbitrary.
+    let turns = 1000.0;
+    let mut theta = 0.0;
+    let max_angle = turns * 2.0 * PI;
 
     let a = 0.0;
-    let b = 1.0;
-    let loops = 100.0;
+    let b = 1.2;
+    let sample_length = 7.0;
 
-    let slice = 2.0 * PI / iterations as f64;
-
-    for i in 0..iterations {
-        theta = loops * i as f64 * slice;
+    while theta < max_angle {
+        theta += 0.005;
         r = a + b * theta;
-        x = origin_x + r * theta.cos();
-        y = origin_y + r * theta.sin();
-        if x < 0.0 || x > output_width || y < 0.0 || y > output_height {
+        if r >= max_radius {
             break;
         }
-        let p0 = Point{x, y};
+        // The current point on the spiral
+        let p0 = Point{
+            x: origin_x + r * theta.cos(),
+            y: origin_y + r * theta.sin()
+        };
+        // We generate two points centered around p0 in the direction of theta,
+        // one towards the center of the spiral, the other away from.
         let p1 = Point{
-            x: p0.x - sample_length * theta.cos(),
-            y: p0.y - sample_length * theta.sin()
+            x: p0.x - (sample_length * 0.5) * theta.cos(),
+            y: p0.y - (sample_length * 0.5) * theta.sin()
         };
         let p2 = Point{
-            x: p0.x + sample_length * theta.cos(),
-            y: p0.y + sample_length * theta.sin()
+            x: p0.x + (sample_length * 0.5) * theta.cos(),
+            y: p0.y + (sample_length * 0.5) * theta.sin()
         };
-
-        let dist = p1.dist(&p2) as u32;
-        let mut pixels = vec!();
-        for i in 0..dist {
-            let sx = (p1.x + i as f64 * theta.cos()).round() as u32;
-            let sy = (p1.y + i as f64 * theta.sin()).round() as u32;
-            if sx > size - 1 || sy > size - 1 {
-                continue;
-            }
-            // println!("Put {}, {}", sx, sy);
-            let pixel = source.get_pixel(sx, sy);
-            pixels.push(pixel);
-        };
-        let average_rgb = get_average_rgb(&pixels);
+        // Get the average rgb between our two points
+        let average_rgb = get_average_rgb_between_points(&source, &p1, &p2);
         let luma = average_rgb.to_luma();
-
-        let mut dist2 = ((255.0 - luma.data[0] as f64) / 255.0) * (sample_length * 2.0);
-        if dist2 < 1.0 {
-            dist2 = 1.0;
+        // Convert average rgb into luma and then normalise the luma to a value
+        // between 0 and sample_length
+        let mut length = ((255.0 - luma.data[0] as f64) / 255.0) * sample_length;
+        // Make sure length is not less than 1
+        if length < 1.0 {
+            length = 1.0;
         }
         let p1 = Point{
-            x: p0.x - dist2 * theta.cos(),
-            y: p0.y - dist2 * theta.sin()
+            x: p0.x - (length * 0.5) * theta.cos(),
+            y: p0.y - (length * 0.5) * theta.sin()
         };
         let p2 = Point{
-            x: p0.x + dist2 * theta.cos(),
-            y: p0.y + dist2 * theta.sin()
+            x: p0.x + (length * 0.5) * theta.cos(),
+            y: p0.y + (length * 0.5) * theta.sin()
         };
         draw_line(&mut output, &p1, &p2, black);
     }
@@ -121,6 +109,23 @@ fn get_average_rgb(pixels: &Vec<&Rgb<u8>>) -> Rgb<u8> {
     return Rgb([r.round() as u8, g.round() as u8, b.round() as u8])
 }
 
+fn get_average_rgb_between_points(source: &RgbImage, p1: &Point, p2: &Point) -> Rgb<u8> {
+    let dist = p1.dist(&p2) as u32;
+    let theta = p1.angle(&p2);
+    let (width, height) = source.dimensions();
+    let mut pixels = vec!();
+    for i in 0..dist {
+        let sx = (p1.x + i as f64 * theta.cos()).round() as u32;
+        let sy = (p1.y + i as f64 * theta.sin()).round() as u32;
+        if sx > width - 1 || sy > height - 1 {
+            continue;
+        }
+        let pixel = source.get_pixel(sx, sy);
+        pixels.push(pixel);
+    };
+    get_average_rgb(&pixels)
+}
+
 fn fill_image(image: &mut RgbImage, color: Rgb<u8>) {
     let (width, height) = image.dimensions();
     for y in 0..height {
@@ -140,7 +145,6 @@ fn draw_line(target: &mut RgbImage, from: &Point, to: &Point, color: Rgb<u8>) {
     for i in 0..dist {
         let x = (from.x + i as f64 * angle.cos()).round() as u32;
         let y = (from.y + i as f64 * angle.sin()).round() as u32;
-        // println!("Put {}, {}", x, y);
         if x > width - 1 || y > height - 1 {
             continue;
         }
@@ -151,9 +155,5 @@ fn draw_line(target: &mut RgbImage, from: &Point, to: &Point, color: Rgb<u8>) {
 fn main() {
     let mut norma = image::open("norma.jpg").unwrap().to_rgb();
     let output = render(&mut norma);
-    // // let output = render(&norma);
-    // let p1 = Point{x: 0.0, y: 0.0};
-    // let p2 = Point{x: 50.0, y: 50.0};
-    // draw_line(&mut norma, &p1, &p2);
     output.save("output.png").unwrap();
 }
