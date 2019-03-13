@@ -1,7 +1,9 @@
 extern crate image;
 
-use image::*;
+use std::env;
 use std::f64::consts::PI;
+use std::process::exit;
+use image::*;
 
 #[derive(Debug)]
 struct Point {
@@ -25,7 +27,12 @@ fn render(source: &mut RgbImage) -> RgbImage {
     let white = Rgb([255, 255, 255]);
     let black = Rgb([0, 0, 0]);
 
-    let size = source.width() as f64;
+    let (width, height) = source.dimensions();
+    let size = if width <= height {
+        width as f64
+    } else {
+        height as f64
+    };
     // Keep the spiral within a 5px gutter
     let max_radius = (size * 0.5) - 5.0;
 
@@ -49,7 +56,7 @@ fn render(source: &mut RgbImage) -> RgbImage {
     let sample_length = 7.0;
 
     while theta < max_angle {
-        theta += 0.005;
+        theta += 0.003;
         r = a + b * theta;
         if r >= max_radius {
             break;
@@ -75,7 +82,7 @@ fn render(source: &mut RgbImage) -> RgbImage {
         // Convert average rgb into luma and then normalise the luma to a value
         // between 0 and sample_length
         let mut length = ((255.0 - luma.data[0] as f64) / 255.0) * sample_length;
-        // Make sure length is not less than 1
+        // Make sure length is not less than 1, purely for asthetic reasons
         if length < 1.0 {
             length = 1.0;
         }
@@ -153,7 +160,22 @@ fn draw_line(target: &mut RgbImage, from: &Point, to: &Point, color: Rgb<u8>) {
 }
 
 fn main() {
-    let mut norma = image::open("norma.jpg").unwrap().to_rgb();
-    let output = render(&mut norma);
-    output.save("output.png").unwrap();
+    let args: Vec<String> = env::args().collect();
+
+    let input_path = match args.get(1) {
+        Some(input_path) => input_path,
+        _ => {
+            eprintln!("error: image path required");
+            exit(1);
+        }
+    };
+
+    let output_path = match args.get(2) {
+        Some(output_path) => output_path,
+        _ => "output.png"
+    };
+
+    let mut source = image::open(input_path).unwrap().to_rgb();
+    let output = render(&mut source);
+    output.save(output_path).unwrap();
 }
