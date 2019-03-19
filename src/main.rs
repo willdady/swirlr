@@ -1,9 +1,10 @@
 extern crate image;
+extern crate clap;
 
-use std::env;
 use std::f64::consts::PI;
-use std::process::exit;
+
 use image::*;
+use clap::{Arg, App};
 
 #[derive(Debug)]
 struct Point {
@@ -160,20 +161,30 @@ fn draw_line(target: &mut RgbImage, from: &Point, to: &Point, color: Rgb<u8>) {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let matches = App::new("Swirl")
+        .version("1.0")
+        .author("Will Dady <willdady@gmail.com>")
+        .about("Swirls an image")
+        .arg(
+            Arg::with_name("input")
+                .index(1)
+                .value_name("INPUT")
+                .help("Path to input image")
+                .required(true)
+                .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("output")
+                .index(2)
+                .value_name("OUTPUT")
+                .help("Path to output image")
+                .takes_value(true)
+                .default_value("output.png")
+        )
+        .get_matches();
 
-    let input_path = match args.get(1) {
-        Some(input_path) => input_path,
-        _ => {
-            eprintln!("error: image path required");
-            exit(1);
-        }
-    };
-
-    let output_path = match args.get(2) {
-        Some(output_path) => output_path,
-        _ => "output.png"
-    };
+    let input_path = matches.value_of("input").unwrap();
+    let output_path = matches.value_of("output").unwrap();
 
     let mut source = image::open(input_path).unwrap().to_rgb();
     let output = render(&mut source);
