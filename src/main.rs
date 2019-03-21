@@ -24,10 +24,7 @@ impl Point {
     }
 }
 
-fn render(source: &mut RgbImage) -> RgbImage {
-    let white = Rgb([255, 255, 255]);
-    let black = Rgb([0, 0, 0]);
-
+fn swirl(source: &mut RgbImage) -> (f64, Vec<Point>, Vec<Point>) {
     let (width, height) = source.dimensions();
     let size = if width <= height {
         width as f64
@@ -37,24 +34,24 @@ fn render(source: &mut RgbImage) -> RgbImage {
     // Keep the spiral within a 5px gutter
     let max_radius = (size * 0.5) - 5.0;
 
-    let mut output = RgbImage::new(size as u32, size as u32);
-    fill_image(&mut output, white);
-
     let origin_x = size * 0.5;
     let origin_y = size * 0.5;
     let mut r;
 
     // The number of turns of the spiral, set arbitrarily large
     // so the spiral is larger than the source image. Note the
-    // loop below will break before this number of turns is reached
+    // loop below will `break` before this number of turns is reached
     // hence why this is arbitrary.
     let turns = 1000.0;
     let mut theta = 0.0;
     let max_angle = turns * 2.0 * PI;
 
-    let a = 0.0;
-    let b = 1.2;
+    let a = 0.0;  // The starting radius
+    let b = 1.2;  // The growth rate of the spiral through each iteration of the loop
     let sample_length = 7.0;
+
+    let mut inner = vec!();
+    let mut outer = vec!();
 
     while theta < max_angle {
         theta += 0.003;
@@ -95,15 +92,16 @@ fn render(source: &mut RgbImage) -> RgbImage {
             x: p0.x + (length * 0.5) * theta.cos(),
             y: p0.y + (length * 0.5) * theta.sin()
         };
-        draw_line(&mut output, &p1, &p2, black);
+        inner.push(p1);
+        outer.push(p2);
     }
-    output
+    (size, inner, outer)
 }
 
 fn get_average_rgb(pixels: &Vec<&Rgb<u8>>) -> Rgb<u8> {
-    let mut r: f64 = 0.0;
-    let mut g: f64 = 0.0;
-    let mut b: f64 = 0.0;
+    let mut r = 0.0;
+    let mut g = 0.0;
+    let mut b = 0.0;
     let mut count = 0.0;
     for i in pixels {
         r += i.data[0] as f64;
@@ -134,32 +132,6 @@ fn get_average_rgb_between_points(source: &RgbImage, p1: &Point, p2: &Point) -> 
     get_average_rgb(&pixels)
 }
 
-fn fill_image(image: &mut RgbImage, color: Rgb<u8>) {
-    let (width, height) = image.dimensions();
-    for y in 0..height {
-        for x in 0..width {
-            image.put_pixel(x, y, color);
-        }
-    }
-}
-
-fn draw_line(target: &mut RgbImage, from: &Point, to: &Point, color: Rgb<u8>) {
-    let dist = from.dist(&to) as u32;
-    let (width, height) = target.dimensions();
-    if dist == 0 {
-        return;
-    }
-    let angle = from.angle(to);
-    for i in 0..dist {
-        let x = (from.x + i as f64 * angle.cos()).round() as u32;
-        let y = (from.y + i as f64 * angle.sin()).round() as u32;
-        if x > width - 1 || y > height - 1 {
-            continue;
-        }
-        target.put_pixel(x, y, color);
-    }
-}
-
 fn main() {
     let matches = App::new("Swirl")
         .version("1.0")
@@ -173,20 +145,36 @@ fn main() {
                 .required(true)
                 .takes_value(true)
         )
-        .arg(
-            Arg::with_name("output")
-                .index(2)
-                .value_name("OUTPUT")
-                .help("Path to output image")
-                .takes_value(true)
-                .default_value("output.png")
-        )
         .get_matches();
 
     let input_path = matches.value_of("input").unwrap();
-    let output_path = matches.value_of("output").unwrap();
 
     let mut source = image::open(input_path).unwrap().to_rgb();
-    let output = render(&mut source);
-    output.save(output_path).unwrap();
+    let (size, inner, outer) = swirl(&mut source);
+
+    let mut path = String::new();
+
+    path.push_str(&format!("M{:1.2} {:1.2}", size * 0.5, size * 0.5));
+
+    let mut previous_point = &Point{x: size * 0.5, y: size * 0.5};
+
+    for p1 in inner.iter() {
+        if previous_point.dist(p1) > 2.0 {
+            path.push_str(&format!(" L{:1.2} {:1.2}", p1.x, p1.y));
+            previous_point = p1;
+        }
+    }
+
+    for p2 in outer.iter().rev() {
+        if previous_point.dist(p2) > 2.0 {
+            path.push_str(&format!(" L{:1.2} {:1.2}", p2.x, p2.y));
+            previous_point = p2;
+        }
+    }
+
+    path.push_str(" Z");
+
+    print!("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\">
+        <path fill=\"black\" d=\"{path}\" />
+    </svg>", size=size, path=path);
 }
