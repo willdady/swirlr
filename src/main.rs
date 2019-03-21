@@ -25,12 +25,20 @@ impl Point {
 }
 
 fn swirl(source: &mut RgbImage) -> (f64, Vec<Point>, Vec<Point>) {
+    // Output dimension
+    let size = 500.0;
+    // Centre-crop image to a square and resize to `size`
+    let mut im: RgbImage;
     let (width, height) = source.dimensions();
-    let size = if width <= height {
-        width as f64
+    im = if width == height {
+        imageops::crop(source, 0, 0, width, height).to_image()
+    } else if width < height {
+        imageops::crop(source, 0, ((height as f64 - width as f64) * 0.5).floor() as u32, width, width).to_image()
     } else {
-        height as f64
+        imageops::crop(source, ((width as f64 - height as f64) * 0.5).floor() as u32, 0, height, height).to_image()
     };
+    im = imageops::resize(&im, size as u32, size as u32, imageops::FilterType::Nearest);
+
     // Keep the spiral within a 5px gutter
     let max_radius = (size * 0.5) - 5.0;
 
@@ -75,7 +83,7 @@ fn swirl(source: &mut RgbImage) -> (f64, Vec<Point>, Vec<Point>) {
             y: p0.y + (sample_length * 0.5) * theta.sin()
         };
         // Get the average rgb between our two points
-        let average_rgb = get_average_rgb_between_points(&source, &p1, &p2);
+        let average_rgb = get_average_rgb_between_points(&im, &p1, &p2);
         let luma = average_rgb.to_luma();
         // Convert average rgb into luma and then normalise the luma to a value
         // between 0 and sample_length
