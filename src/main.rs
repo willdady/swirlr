@@ -141,10 +141,10 @@ fn get_average_rgb_between_points(source: &RgbImage, p1: &Point, p2: &Point) -> 
 }
 
 fn main() {
-    let matches = App::new("Swirl")
+    let matches = App::new("swirlr")
         .version("1.0")
         .author("Will Dady <willdady@gmail.com>")
-        .about("Swirls an image")
+        .about("Creates an SVG from an input image sampling along the path of an archimedian spiral")
         .arg(
             Arg::with_name("input")
                 .index(1)
