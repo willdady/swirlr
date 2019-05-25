@@ -10,4 +10,6 @@ The input image will be center-cropped to a square. For best results use a high-
 cargo run input.jpg > output.svg
 ```
 
-<img src="examples/scream.png?raw=true" width="256" height="256" />
+<img src="examples/scream.png?raw=true" width="384" height="384" />
+
+To see a version of this compiled to Web Assembly check out [swirlr-wasm](https://github.com/willdady/swirlr-wasm)!
