@@ -27,7 +27,7 @@ swirlr --color "red" input.jpg > output.svg
 Note if you're running via cargo don't forget the `--` so cargo doesn't interpret the option on itself.
 
 ```
-cargo run -- --option "red" input.jpg > output.svg
+cargo run -- --color "red" input.jpg > output.svg
 ```
 
 <img src="examples/scream.png?raw=true" width="384" height="384" />
