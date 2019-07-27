@@ -4,8 +4,6 @@ extern crate clap;
 mod geometry;
 mod svg;
 
-use std::f64::consts::PI;
-
 use image::*;
 use clap::{Arg, App};
 use geometry::Point;
@@ -32,13 +30,7 @@ fn swirl(source: &mut RgbImage) -> (f64, Vec<Point>) {
     let origin_y = size * 0.5;
     let mut r;
 
-    // The number of turns of the spiral, set arbitrarily large
-    // so the spiral is larger than the source image. Note the
-    // loop below will `break` before this number of turns is
-    // reached hence why this is arbitrary.
-    let turns = 1000.0;
-    let mut theta = 0.0;
-    let max_angle = turns * 2.0 * PI;
+    let mut theta: f64 = 0.0;
 
     let a = 0.0;  // The starting radius
     let b = 1.2;  // The growth rate of the spiral through each iteration of the loop
@@ -47,7 +39,8 @@ fn swirl(source: &mut RgbImage) -> (f64, Vec<Point>) {
     let mut inner = vec!();
     let mut outer = vec!();
 
-    while theta < max_angle {
+    // while theta < max_angle {
+    loop {
         theta += 0.003;
         r = a + b * theta;
         if r >= max_radius {
@@ -147,15 +140,24 @@ fn main() {
                 .required(true)
                 .takes_value(true)
         )
+        .arg(
+            Arg::with_name("color")
+                .long("color")
+                .value_name("COLOR")
+                .help("Fill color")
+                .takes_value(true)
+                .default_value("black")
+        )
         .get_matches();
 
     let input_path = matches.value_of("input").unwrap();
+    let color = matches.value_of("color").unwrap();
 
     let mut source = image::open(input_path).unwrap().to_rgb();
     let (size, points) = swirl(&mut source);
 
     let mut path = svg::Path::new();
-    path.set_fill("black");
+    path.set_fill(color);
     path.d.move_to(size * 0.5, size * 0.5);
 
     let mut previous_point = &Point::new(size * 0.5, size * 0.5);
