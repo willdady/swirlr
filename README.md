@@ -30,4 +30,6 @@ Note if you're running via cargo don't forget the `--` so cargo doesn't interpre
 cargo run -- --option "red" input.jpg > output.svg
 ```
 
-<img src="examples/scream.png?raw=true" width="256" height="256" />
+<img src="examples/scream.png?raw=true" width="384" height="384" />
+
+To see a version of this compiled to Web Assembly check out [swirlr-wasm](https://github.com/willdady/swirlr-wasm)!
