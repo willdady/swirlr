@@ -4,10 +4,30 @@ Experimental command line app written in [Rust](https://www.rust-lang.org/) whic
 
 The input image will be center-cropped to a square. For best results use a high-contrast input image.
 
+## Building
+
+Build with cargo
+
+```
+cargo build --release
+```
+
 ## Usage
 
 ```
-cargo run input.jpg > output.svg
+swirlr input.jpg > output.svg
+```
+
+You may optionally set a color with `--color`.
+
+```
+swirlr --color "red" input.jpg > output.svg
+```
+
+Note if you're running via cargo don't forget the `--` so cargo doesn't interpret the option on itself.
+
+```
+cargo run -- --option "red" input.jpg > output.svg
 ```
 
 <img src="examples/scream.png?raw=true" width="256" height="256" />
