@@ -6,13 +6,13 @@ use image::*;
 use crate::geometry::*;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
-pub enum MaxRadius {
+pub enum Crop {
     Contain,
     Overflow,
 }
 
 pub struct Swirlr<'a> {
-    pub max_radius: MaxRadius,
+    pub crop: Crop,
     pub origin_x: f64,
     pub origin_y: f64,
     pub source: &'a mut RgbImage,
@@ -24,7 +24,7 @@ pub struct Swirlr<'a> {
 impl<'a> Swirlr<'a> {
     pub fn new(source: &'a mut RgbImage) -> Swirlr {
         Swirlr {
-            max_radius: MaxRadius::Overflow,
+            crop: Crop::Overflow,
             source,
             output_size: 500.0,
             origin_x: 250.0,
@@ -34,8 +34,8 @@ impl<'a> Swirlr<'a> {
         }
     }
 
-    pub fn set_max_radius(mut self, max_radius: MaxRadius) -> Swirlr<'a> {
-        self.max_radius = max_radius;
+    pub fn set_crop(mut self, crop: Crop) -> Swirlr<'a> {
+        self.crop = crop;
         self
     }
 
@@ -84,9 +84,9 @@ impl<'a> Swirlr<'a> {
         };
         im = imageops::resize(&im, size as u32, size as u32, imageops::FilterType::Nearest);
 
-        let max_radius: f64 = match self.max_radius {
-            MaxRadius::Contain => (size * 0.5) - 5.0,
-            MaxRadius::Overflow => {
+        let crop: f64 = match self.crop {
+            Crop::Contain => (size * 0.5) - 5.0,
+            Crop::Overflow => {
                 let tl = Point::new(0.0, 0.0);
                 let tr = Point::new(self.output_size, 0.0);
                 let br = Point::new(self.output_size, self.output_size);
@@ -119,7 +119,7 @@ impl<'a> Swirlr<'a> {
         loop {
             theta += 0.003;
             r = a + b * theta;
-            if r >= max_radius {
+            if r >= crop {
                 break;
             }
             // The current point on the spiral

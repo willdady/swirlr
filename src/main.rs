@@ -6,7 +6,7 @@ mod svg;
 mod swirlr;
 
 use clap::Parser;
-use swirlr::{MaxRadius, Swirlr};
+use swirlr::{Crop, Swirlr};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -16,8 +16,8 @@ struct Cli {
     source: String,
 
     /// Whether spiral should extend past the edge of the canvas
-    #[clap(default_value_t = MaxRadius::Overflow, short, long, arg_enum, value_parser)]
-    max_radius: MaxRadius,
+    #[clap(default_value_t = Crop::Overflow, long, arg_enum, value_parser)]
+    crop: Crop,
 
     /// Spiral color
     #[clap(default_value_t = String::from("#000"), short, long, value_parser)]
@@ -48,7 +48,7 @@ fn main() {
     let cli = Cli::parse();
     let input_path = cli.source;
     let color = cli.color;
-    let max_radius = cli.max_radius;
+    let crop = cli.crop;
     let growth_rate = cli.growth_rate;
     let origin_x = cli.origin_x;
     let origin_y = cli.origin_y;
@@ -58,7 +58,7 @@ fn main() {
     let mut source = image::open(input_path).unwrap().to_rgb8();
 
     let (size, points) = Swirlr::new(&mut source)
-        .set_max_radius(max_radius)
+        .set_crop(crop)
         .set_growth_rate(growth_rate)
         .set_origin(origin_x, origin_y)
         .set_invert(invert)
